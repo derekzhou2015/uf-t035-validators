@@ -25,6 +25,14 @@ def _username_regex():
 
 
 @lru_cache
+def _auth_control_char_regex():
+    """Control characters never allowed in a decoded auth segment."""
+    # Same set `url()` rejects in raw form: white spaces and C0/DEL
+    # controls. Percent-encoding must not change the verdict.
+    return re.compile(r"[\s\x00-\x1f\x7f]")
+
+
+@lru_cache
 def _path_regex():
     return re.compile(
         # allowed symbols
@@ -75,6 +83,13 @@ def _validate_auth_segment(value: str):
     """Validate authentication segment."""
     if not value:
         return True
+    # Judge the segment by its decoded form: a percent-encoded control
+    # character (%0D, %0A, %00, %09, ...) is the same character once a
+    # downstream client decodes it, so it must get the same verdict as
+    # the raw form, which `url()` rejects up front. One `unquote` plus
+    # one scan, only when the netloc actually carries an auth segment.
+    if _auth_control_char_regex().search(unquote(value)):
+        return False
     if (colon_count := value.count(":")) > 1:
         # everything before @ is then considered as a username
         # this is a bad practice, but syntactically valid URL

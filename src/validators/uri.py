@@ -10,7 +10,7 @@ from urllib.parse import urlsplit
 # local
 from .email import email
 from .hostname import hostname
-from .url import url
+from .url import _validate_auth_segment, url
 from .utils import validator
 
 
@@ -67,7 +67,11 @@ def _telnet_url(value: str):
 
     # handling any additional checks user/pass
     if "@" in netloc:
-        netloc = netloc.rsplit("@", 1)[1]
+        auth_segment, netloc = netloc.rsplit("@", 1)
+        if not _validate_auth_segment(auth_segment):
+            # same decoded-control-character rule as `url()`:
+            # raw controls were rejected above, encoded ones land here
+            return False
     return hostname(netloc, may_have_port=True)
 
 

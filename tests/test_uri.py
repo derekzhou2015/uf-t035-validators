@@ -43,6 +43,32 @@ def test_invalid_telnet_uri(value: str):
     assert not uri(value)
 
 
+@pytest.mark.parametrize("encoded", ["%00", "%09", "%0A", "%0D", "%0d%0a", "%7F"])
+@pytest.mark.parametrize(
+    "template",
+    [
+        "telnet://user{encoded}@example.com",
+        "telnet://user{encoded}:password@example.com",
+        "telnet://user:pass{encoded}word@example.com:23/",
+    ],
+)
+def test_telnet_rejects_percent_encoded_controls_in_auth(encoded: str, template: str):
+    """Reject control characters percent-encoded into the telnet auth segment."""
+    assert not uri(template.format(encoded=encoded))
+
+
+@pytest.mark.parametrize(
+    "value",
+    [
+        "telnet://user%40name:password@example.com",
+        "telnet://userid:p%40ss%21word@example.com:23/",
+    ],
+)
+def test_telnet_accepts_legit_percent_encoded_auth(value: str):
+    """Keep non-control percent-encoded auth characters valid."""
+    assert uri(value)
+
+
 @pytest.mark.parametrize(
     "value",
     [

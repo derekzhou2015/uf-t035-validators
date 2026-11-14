@@ -260,6 +260,46 @@ def test_url_accepts_percent_encoded_controls(encoded: str, template: str):
 
 
 @pytest.mark.parametrize(
+    "encoded",
+    ["%00", "%09", "%0A", "%0D", "%1F", "%7F", "%0d%0a", "%0D%0A", "%20"],
+)
+@pytest.mark.parametrize(
+    "template",
+    [
+        "https://user{encoded}@example.com/",
+        "https://user{encoded}:password@example.com/",
+        "https://userid:pass{encoded}word@example.com/",
+        "https://user{encoded}name:pass:word@example.com/",
+    ],
+)
+def test_url_rejects_percent_encoded_controls_in_auth(encoded: str, template: str):
+    """Reject control characters percent-encoded into the auth segment."""
+    assert isinstance(url(template.format(encoded=encoded)), ValidationError)
+
+
+@pytest.mark.parametrize("code", list(range(32)) + [0x7F])
+def test_url_auth_encoded_and_raw_controls_agree(code: int):
+    """Encoded and raw control characters in the auth segment get the same verdict."""
+    raw = url(f"https://user{chr(code)}@example.com/")
+    encoded = url(f"https://user%{code:02X}@example.com/")
+    assert isinstance(raw, ValidationError)
+    assert isinstance(encoded, ValidationError)
+
+
+@pytest.mark.parametrize(
+    "value",
+    [
+        "https://user%40name:password@example.com/",
+        "https://userid:p%40ss%21word@example.com/",
+        "https://user%3Aname:password@example.com/",
+    ],
+)
+def test_url_accepts_legit_percent_encoded_auth(value: str):
+    """Keep non-control percent-encoded auth characters valid."""
+    assert url(value) is True
+
+
+@pytest.mark.parametrize(
     "value",
     ["https://example.\uff43\uff4f\uff4d/", "https://exam\u00adple.com/", "http://\u017ferver/"],
 )
